@@ -24,13 +24,68 @@ bool loadInitialState(const char* filename,
     return false;   
 }
 
-bool validateStartingRoom(int startFloor, int startRoom,
-                          const char horizontalConn[NUM_FLOORS][ROOMS_PER_FLOOR - 1]) {
+bool validateStartingRoom(int startFloor, int startRoom, const char horizontalConn[NUM_FLOORS][ROOMS_PER_FLOOR - 1]) 
+{
     (void)startFloor; (void)startRoom; (void)horizontalConn;
     return false;  
 }
 
-const char* getEntityName(char entitySymbol) {
-    (void)entitySymbol;
-    return "Unknown";   // TODO
+const char* getEntityName(char entitySymbol) 
+{
+    switch (entitySymbol)
+    {
+    case ENT_MASTER_KEY: 
+    return "Master Key";
+    case ENT_ENERGY_PACK:
+    return "Energy Pack";
+    case ENT_EMERGENCY_TOOLKIT:
+    return "Emergency Toolkit";
+    case ENT_CLUE_4:
+    return "Clue Digit 4";
+    case ENT_FUSE:
+    return "Fuse";
+    case ENT_CAT:
+    return "stranded cat";
+    case ENT_CONTROL_PANEL:
+    return "Control Panel Terminal";
+    case ENT_LIFT_PASS:
+    return "Lift Pass";
+    case ENT_PASSENGER:
+    return "Stranded Passenger";
+    case ENT_MEDICAL_KIT:
+    return "Medical Kit";
+    case ENT_EMERRGNCY_CARD:
+    return "Emergency Access card";
+    case ENT_CLUE_7:
+    return "Clue Digit 7";
+    case ENT_CLUE_2:
+    return "Clue Digit 2";
+    case ENT_CABINET_TRAIN_KEY:
+    return "Cabinet/Train Key";
+    case ENT_CAT_CARRIER:
+    return "Cat Carrier";
+    case ENT_OBSERVATION_TOKEN:
+    return "Observation Token";
+    default:
+    return "Unknown";
+    }  
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
