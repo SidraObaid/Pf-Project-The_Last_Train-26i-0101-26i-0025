@@ -1,6 +1,6 @@
 #include "physics.h"
 #include "util.h"
-#include "state.h"
+
 
 // Movement validation and resource adjustments without structures
 #include <iostream>
@@ -14,7 +14,7 @@ bool isDirectlyConnected(int fromF, int fromR, int toF, int toR, const char hori
  else if(fromF!=toF&&fromR!=toR)
   return false;
  else if(fromF==toF){
-  if(toR-fromR==1){
+  if(fromR-toR==-1){
    outConnType=horizontalConn[fromF-1][fromR-1];
    if(outConnType=='#'||outConnType==' '){
     return false;}
@@ -24,7 +24,7 @@ bool isDirectlyConnected(int fromF, int fromR, int toF, int toR, const char hori
    if(outConnType=='#'||outConnType==' '){
     return false;}
    return true;}}
- return false;}
+return false;}
  
 bool canTraverse(int targetFloor, int targetRoom,char connType,const char inventory[MAX_INVENTORY_CAPACITY], int inventoryCount,int emergencyTripsLeft, bool lift2Operational){
  if(targetFloor<1||targetFloor>NUM_FLOORS||targetRoom<1||targetRoom>ROOMS_PER_FLOOR)
