@@ -37,7 +37,7 @@ bool canTraverse(int targetFloor, int targetRoom,char connType,const char invent
     return true;}
   return false;}
  else if(connType=='2'){
-  if(targetRoom!=4||(targetFloor!=2&&targetFloor!=4&&targetFloor!=5))
+  if(targetRoom!=4||(targetFloor!=2 && targetFloor!=4 && targetFloor!=5))
    return false;
   if(lift2Operational==true)
    return true;
@@ -47,7 +47,7 @@ bool canTraverse(int targetFloor, int targetRoom,char connType,const char invent
      return true;}}
   return false;}
  else if(connType=='1'){
-  if((targetFloor!=1&&targetFloor!=2)||(targetRoom!=2&&targetRoom!=3))
+  if((targetFloor!=1 && targetFloor!=2)||(targetRoom!=2 && targetRoom!=3))
    return false;
   return true;}
  else
