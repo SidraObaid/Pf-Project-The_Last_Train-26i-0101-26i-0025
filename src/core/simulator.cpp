@@ -8,7 +8,7 @@
 #include<iostream>
 using namespace std;
 
-// Main simulation loop handling rendering, menu choices, and end-of-game report
+// Main simulation loop
 void runSimulation(int& playerFloor, int& playerRoom, int& energy, int& time, int& score, char inventory[MAX_INVENTORY_CAPACITY], int& inventoryCount,
     bool objectives[NUM_OBJECTIVES], int& emergencyTripsLeft, char horizontalConn[NUM_FLOORS][ROOMS_PER_FLOOR - 1], char roomEntities[NUM_FLOORS][ROOMS_PER_FLOOR][MAX_ENTITIES_PER_ROOM],
     int entityCounts[NUM_FLOORS][ROOMS_PER_FLOOR]){
@@ -64,18 +64,19 @@ void runSimulation(int& playerFloor, int& playerRoom, int& energy, int& time, in
    default:
     cout<<"Invalid choice."<<endl;
     break;}
-  // Clamp energy and time before checking end conditions
-  energy=clamp(energy, 0, MAX_ENERGY);
-  time=clamp(time, 0, MAX_TIME);
+  // Clamp energy and time
+  energy=clampInt(energy, 0, MAX_ENERGY);
+  time=clampInt(time, 0, MAX_TIME);
   if (checkEndConditions(energy, time, objectives)==true) {
    break;}}
  // Write final report
  writeGameSummaryReport("out/game_summary.txt", score, energy, time, objectives, objectives[OBJ_MISSION_WON]);}
 
-// Validates connection and moves player to target floor and room
+//execute move
 bool handleMoveCommand(int targetFloor, int targetRoom, int& currentFloor, int& currentRoom, int& energy, int& time, const char horizontalConn[NUM_FLOORS][ROOMS_PER_FLOOR - 1],
                        const char inventory[MAX_INVENTORY_CAPACITY], int inventoryCount, int& emergencyTripsLeft, bool lift2Operational){
- char connType=' ';
+ char connType=CONN_NONE;
+ // Check lift connections
  if (isDirectlyConnected(currentFloor, currentRoom, targetFloor, targetRoom, horizontalConn, connType)!=true) {
   if (canUseLift2(currentFloor, targetFloor, lift2Operational, emergencyTripsLeft)==true && targetRoom==4) {
    connType='2';}
@@ -84,20 +85,27 @@ bool handleMoveCommand(int targetFloor, int targetRoom, int& currentFloor, int& 
  if (canTraverse(targetFloor, targetRoom, connType, inventory, inventoryCount, emergencyTripsLeft, lift2Operational)!=true) {
   cout<<"Cannot move."<<endl;
   return false;}
+ //use emergency lift trip
  if (connType=='2') {
   if ((lift2Operational && hasItem(inventory, inventoryCount, ENT_LIFT_PASS))!=true) {
    emergencyTripsLeft--;
    removeItem(inventory, inventoryCount, ENT_EMERGENCY_CARD);}}
  currentFloor=targetFloor;
  currentRoom=targetRoom;
- applyResourceDelta(energy, time, -ENERGY_COST_MOVE, TIME_COST_MOVE);
+
+ if (connType=='1' || connType=='2') {
+  applyResourceDelta(energy, time, COST_MOVE_LIFT_ENERGY, COST_MOVE_LIFT_TIME);}
+ else if (connType==CONN_WINDOW) {
+  applyResourceDelta(energy, time, COST_MOVE_WINDOW_ENERGY, COST_MOVE_WINDOW_TIME);}
+ else {
+  applyResourceDelta(energy, time, COST_MOVE_ORDINARY_ENERGY, COST_MOVE_ORDINARY_TIME);}
  cout<<"Moved to Floor "<<currentFloor<<", Room "<<currentRoom<<"."<<endl;
  return true;}
 
-// Reveals room entities and awards points for newly discovered clues
+// Inspect
 bool handleInspectCommand(int currentFloor, int currentRoom, int& energy, int& time, const char roomEntities[NUM_FLOORS][ROOMS_PER_FLOOR][MAX_ENTITIES_PER_ROOM], int entityCount,
                           bool objectives[NUM_OBJECTIVES], int& score){
- applyResourceDelta(energy, time, -ENERGY_COST_INSPECT, TIME_COST_INSPECT);
+ applyResourceDelta(energy, time, COST_INSPECT_ENERGY, COST_INSPECT_TIME);
  if(entityCount==0){
   cout<<"There is nothing in this room."<<endl;
   return true;}
@@ -105,7 +113,7 @@ bool handleInspectCommand(int currentFloor, int currentRoom, int& energy, int& t
  for(int i=0; i<entityCount; i++){
   char symbol=roomEntities[currentFloor-1][currentRoom-1][i];
   cout<<i<<". "<<getEntityName(symbol)<<endl;}
- // Check for clue entities and update clue objectives
+ // Check clue
  for(int i=0; i<entityCount; i++){
   char symbol=roomEntities[currentFloor-1][currentRoom-1][i];
   if(symbol==ENT_CLUE_4 && objectives[OBJ_CLUE_4]!=true){
@@ -122,7 +130,7 @@ bool handleInspectCommand(int currentFloor, int currentRoom, int& energy, int& t
    cout<<"You found clue digit 7! (+"<<SCORE_CLUE_FOUND<<")"<<endl;}}
  return true;}
 
-// Adds item from current room to inventory, updates objectives, and shifts room array
+// collevct item
 bool handleCollectCommand(char itemSymbol, int currentFloor, int currentRoom,
                           int& energy, int& time, int& score,
                           char roomEntities[NUM_FLOORS][ROOMS_PER_FLOOR][MAX_ENTITIES_PER_ROOM],
@@ -135,50 +143,64 @@ bool handleCollectCommand(char itemSymbol, int currentFloor, int currentRoom,
  for (int i=0; i<entityCount; i++) {
   if (roomEntities[currentFloor-1][currentRoom-1][i]==itemSymbol) {
    inventory[inventoryCount++]=itemSymbol;
-   // Shift array left to remove collected item from room
+   // Shift items left
    for (int j=i; j<entityCount-1; j++)
     roomEntities[currentFloor-1][currentRoom-1][j]=roomEntities[currentFloor-1][currentRoom-1][j+1];
    entityCount--;
-   applyResourceDelta(energy, time, -ENERGY_COST_COLLECT, TIME_COST_COLLECT);
-   if (itemSymbol==ENT_MASTER_KEY) objectives[OBJ_MASTER_KEY]=true;
+   applyResourceDelta(energy, time, COST_ITEM_PICKUP_ENERGY, COST_ITEM_PICKUP_TIME);
+   // Update objectives
+   if (itemSymbol==ENT_MASTER_KEY) {
+    objectives[OBJ_MASTER_KEY]=true;
+    applyScoreDelta(score, SCORE_KEY_COLLECT);}
    else if (itemSymbol==ENT_FUSE) objectives[OBJ_FUSE_COLLECTED]=true;
-   else if (itemSymbol==ENT_LIFT_PASS) objectives[OBJ_LIFT_PASS]=true;
-   else if (itemSymbol==ENT_TRAIN_KEY) objectives[OBJ_TRAIN_KEY]=true;
+   else if (itemSymbol==ENT_LIFT_PASS) {
+    objectives[OBJ_LIFT_PASS]=true;
+    applyScoreDelta(score, SCORE_LIFT_PASS);}
+   else if (itemSymbol==ENT_CABINET_TRAIN_KEY) {
+    objectives[OBJ_TRAIN_KEY]=true;
+    applyScoreDelta(score, SCORE_TRAIN_KEY);}
    else if (itemSymbol==ENT_CAT_CARRIER) objectives[OBJ_CAT_CARRIER]=true;
    cout<<"Collected "<<getEntityName(itemSymbol)<<endl;
    return true;}}
  cout<<"Item not found in this room"<<endl;
  return false;}
 
-// Uses an item from inventory if valid in current room and removes it
+// use item from inventory
 bool handleUseCommand(char itemSymbol, int currentFloor, int currentRoom, int& energy, int& time, int& score, char inventory[MAX_INVENTORY_CAPACITY], int& inventoryCount,
                       bool objectives[NUM_OBJECTIVES]){
  for (int i=0; i<inventoryCount; i++) {
   if (inventory[i]==itemSymbol) {
+   // Install fuse on floor 2
    if (itemSymbol==ENT_FUSE && currentFloor==2 && currentRoom==1 && objectives[OBJ_FUSE_INSTALLED]!=true) {
     objectives[OBJ_FUSE_INSTALLED]=true;
-    applyResourceDelta(energy, time, -ENERGY_COST_USE, TIME_COST_USE);
-    applyScoreDelta(score, SCORE_OBJECTIVE);}
-   else if (itemSymbol==ENT_MEDKIT) {
-    applyResourceDelta(energy, time, ENERGY_RESTORE, TIME_COST_USE);
-    applyScoreDelta(score, SCORE_OBJECTIVE);}
+    applyResourceDelta(energy, time, COST_ITEM_USE_ENERGY, COST_ITEM_USE_TIME);
+    applyScoreDelta(score, SCORE_INSTALL_FUSE);}
+   // Use energy pack item
+   else if (itemSymbol==ENT_ENERGY_PACK) {
+    applyResourceDelta(energy, time, BONUS_ENERGY_PACK, COST_ITEM_USE_TIME);}
+   // Use medical kit item
+   else if (itemSymbol==ENT_MEDICAL_KIT) {
+    applyResourceDelta(energy, time, BONUS_ENERGY_PACK, COST_ITEM_USE_TIME);}
+   // Activate lift 2 pass
    else if (itemSymbol==ENT_LIFT_PASS && objectives[OBJ_LIFT2_ACTIVE]!=true) {
     objectives[OBJ_LIFT2_ACTIVE]=true;
-    applyResourceDelta(energy, time, -ENERGY_COST_USE, TIME_COST_USE);
-    applyScoreDelta(score, SCORE_OBJECTIVE);}
+    applyResourceDelta(energy, time, COST_ITEM_USE_ENERGY, COST_ITEM_USE_TIME);
+    applyScoreDelta(score, SCORE_LIFT_PASS);}
+   // Secure stranded cat
    else if (itemSymbol==ENT_CAT_CARRIER && objectives[OBJ_CAT_SECURED]!=true) {
     objectives[OBJ_CAT_SECURED]=true;
-    applyResourceDelta(energy, time, -ENERGY_COST_USE, TIME_COST_USE);
-    applyScoreDelta(score, SCORE_OBJECTIVE);}
-   else if (itemSymbol==ENT_TRAIN_KEY && objectives[OBJ_TRAIN_PREPARED]!=true) {
+    applyResourceDelta(energy, time, COST_ITEM_USE_ENERGY, COST_ITEM_USE_TIME);
+    applyScoreDelta(score, SCORE_SECURE_CAT);}
+   // Prepare train
+   else if (itemSymbol==ENT_CABINET_TRAIN_KEY && objectives[OBJ_TRAIN_PREPARED]!=true) {
     objectives[OBJ_TRAIN_PREPARED]=true;
     objectives[OBJ_MISSION_WON]=true;
-    applyResourceDelta(energy, time, -ENERGY_COST_USE, TIME_COST_USE);
-    applyScoreDelta(score, SCORE_OBJECTIVE);}
+    applyResourceDelta(energy, time, COST_ITEM_USE_ENERGY, COST_ITEM_USE_TIME);
+    applyScoreDelta(score, SCORE_PREPARE_TRAIN + SCORE_MISSION_VICTORY);}
    else {
     cout<<"Cannot use item here"<<endl;
     return false;}
-   // Shift inventory left to remove used item
+   // Shift inventory left
    for (int j=i; j<inventoryCount-1; j++)
     inventory[j]=inventory[j+1];
    inventoryCount--;
@@ -187,7 +209,7 @@ bool handleUseCommand(char itemSymbol, int currentFloor, int currentRoom, int& e
  cout<<"Item is not present in inventory"<<endl;
  return false;}
 
-// Verifies 3-digit code and spawns Train Key upon unlocking cabinet
+// unlock cabinet
 bool handleUnlockCabinetCommand(const char* code, int currentFloor, int currentRoom, bool objectives[NUM_OBJECTIVES], int& score, char roomEntities[NUM_FLOORS][ROOMS_PER_FLOOR][MAX_ENTITIES_PER_ROOM],
                                 int& entityCount){
  if (objectives[OBJ_CABINET_UNLOCKED]==true) {
@@ -197,17 +219,18 @@ bool handleUnlockCabinetCommand(const char* code, int currentFloor, int currentR
   cout<<"Cannot unlock cabinet."<<endl;
   return false;}
  objectives[OBJ_CABINET_UNLOCKED]=true;
- applyScoreDelta(score, SCORE_OBJECTIVE);
+ applyScoreDelta(score, SCORE_CABINET_UNLOCK);
+ // train key
  if (entityCount<MAX_ENTITIES_PER_ROOM) {
-  roomEntities[currentFloor-1][currentRoom-1][entityCount]=ENT_TRAIN_KEY;
+  roomEntities[currentFloor-1][currentRoom-1][entityCount]=ENT_CABINET_TRAIN_KEY;
   entityCount++;}
  cout<<"Cabinet unlocked! Train Key available to pick."<<endl;
  return true;}
 
-// Returns true if player ran out of energy/time or won the mission
+//end conditions
 bool checkEndConditions(int energy, int time, const bool objectives[NUM_OBJECTIVES]){
- energy=clamp(energy, 0, MAX_ENERGY);
- time=clamp(time, 0, MAX_TIME);
+ energy=clampInt(energy, 0, MAX_ENERGY);
+ time=clampInt(time, 0, MAX_TIME);
  if(energy<=0)
   return true;
  else if(time<=0)
